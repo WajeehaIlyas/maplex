@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: sepia
+==================================================
+
+sepia: 4 image(s)
+  -> data/outputs/images/image1__sepia.jpg
+  -> data/outputs/images/image2__sepia.jpg
+  -> data/outputs/images/image3__sepia.jpg
+  -> data/outputs/images/image4__sepia.jpg
+

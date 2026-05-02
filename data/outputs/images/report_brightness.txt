@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: brightness
+==================================================
+
+brightness: 4 image(s)
+  -> data/outputs/images/image1__brightness.jpg
+  -> data/outputs/images/image2__brightness.jpg
+  -> data/outputs/images/image3__brightness.jpg
+  -> data/outputs/images/image4__brightness.jpg
+

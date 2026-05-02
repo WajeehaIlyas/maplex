@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: edge_detect
+==================================================
+
+edge_detect: 4 image(s)
+  -> data/outputs/images/image1__edge_detect.jpg
+  -> data/outputs/images/image2__edge_detect.jpg
+  -> data/outputs/images/image3__edge_detect.jpg
+  -> data/outputs/images/image4__edge_detect.jpg
+

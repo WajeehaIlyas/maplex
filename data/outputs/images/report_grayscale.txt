@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: grayscale
+==================================================
+
+grayscale: 4 image(s)
+  -> data/outputs/images/image1__grayscale.jpg
+  -> data/outputs/images/image2__grayscale.jpg
+  -> data/outputs/images/image3__grayscale.jpg
+  -> data/outputs/images/image4__grayscale.jpg
+

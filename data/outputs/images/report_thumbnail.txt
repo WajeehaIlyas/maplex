@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: thumbnail
+==================================================
+
+thumbnail: 4 image(s)
+  -> data/outputs/images/image1__thumbnail.jpg
+  -> data/outputs/images/image2__thumbnail.jpg
+  -> data/outputs/images/image3__thumbnail.jpg
+  -> data/outputs/images/image4__thumbnail.jpg
+

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-# main.py  —  CLI entry point for the Distributed MapReduce system (Phase 2)
+# main.py  —  Distributed MapReduce CLI (Phase 3)
 #
 # Commands:
-#   python main.py master                  start the master HTTP server
-#   python main.py worker <id> [port]      start a single worker
-#   python main.py run                     master + workers + Phase 1 dummy demo
-#   python main.py wordcount <file>        run word-count MapReduce on a text file
-#   python main.py logcount  <file>        run log-analysis MapReduce on a log file
-#   python main.py demo                    submit Phase 1 dummy job
-#   python main.py status                  print system status
+#   python main.py master                          start master HTTP server
+#   python main.py worker <id> [port]              start a single worker
+#   python main.py run                             master + workers + dummy demo
+#   python main.py wordcount <file>                word-count MapReduce
+#   python main.py logcount  <file>                log-analysis MapReduce
+#   python main.py imageprocess <dir> <transform>  image processing MapReduce
+#   python main.py demo                            Phase 1 dummy job
+#   python main.py status                          system status
+#   python main.py transforms                      list available image transforms
 
 import sys, time, os, multiprocessing
 sys.path.insert(0, os.path.dirname(__file__))
 
-
-# ── Process starters ──────────────────────────────────────────────────────────
 
 def start_master():
     from communication.server import app
@@ -62,7 +62,7 @@ def _spawn_workers(n=None):
     return procs
 
 
-# ── Phase 1 dummy demo ────────────────────────────────────────────────────────
+# ── Phase 1 dummy ─────────────────────────────────────────────────────────────
 
 def run_dummy_demo():
     client = _wait_for_master()
@@ -93,7 +93,7 @@ def run_dummy_demo():
 
 def run_wordcount(filepath):
     from communication.client import MasterClient
-    from core.pipeline    import Pipeline
+    from mapreduce.pipeline    import Pipeline
     from jobs.word_count.mapper  import WordCountMapper
     from jobs.word_count.reducer import WordCountReducer
     from mapreduce.mapper import Mapper
@@ -102,33 +102,26 @@ def run_wordcount(filepath):
     print(f"\n[WORDCOUNT] Reading {filepath}…")
     lines = Mapper.read_file_lines(filepath)
     print(f"[WORDCOUNT] {len(lines)} lines — running MapReduce pipeline…")
-
-    pipeline = Pipeline(
-        mapper_cls  = WordCountMapper,
-        reducer_cls = WordCountReducer,
-        client      = client,
-    )
-    results = pipeline.run(lines)
-
-    print(f"\n[WORDCOUNT] Results — top 20 words by count:")
+    pipeline = Pipeline(WordCountMapper, WordCountReducer, client)
+    results  = pipeline.run(lines)
+    print(f"\n[WORDCOUNT] Top 20 words:")
     print(f"  {'WORD':<20} COUNT")
     print(f"  {'-'*20} -----")
     for word, count in sorted(results.items(), key=lambda x: -x[1])[:20]:
         print(f"  {word:<20} {count}")
-
     outpath = os.path.join("data", "outputs", "wordcount_results.txt")
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
     with open(outpath, "w") as f:
         for word, count in sorted(results.items(), key=lambda x: -x[1]):
             f.write(f"{word}: {count}\n")
-    print(f"\n[WORDCOUNT] Full results saved to {outpath}")
+    print(f"\n[WORDCOUNT] Saved to {outpath}")
 
 
 # ── Phase 2: Log Analysis ─────────────────────────────────────────────────────
 
 def run_logcount(filepath):
     from communication.client import MasterClient
-    from core.pipeline    import Pipeline
+    from mapreduce.pipeline    import Pipeline
     from jobs.log_analysis.mapper  import LogMapper
     from jobs.log_analysis.reducer import LogReducer
     from mapreduce.mapper import Mapper
@@ -137,29 +130,83 @@ def run_logcount(filepath):
     print(f"\n[LOGCOUNT] Reading {filepath}…")
     lines = Mapper.read_file_lines(filepath)
     print(f"[LOGCOUNT] {len(lines)} lines — running MapReduce pipeline…")
-
-    pipeline = Pipeline(
-        mapper_cls  = LogMapper,
-        reducer_cls = LogReducer,
-        client      = client,
-    )
-    results = pipeline.run(lines)
-
+    pipeline = Pipeline(LogMapper, LogReducer, client)
+    results  = pipeline.run(lines)
     print(f"\n[LOGCOUNT] Log level counts:")
     print(f"  {'LEVEL':<12} COUNT")
     print(f"  {'-'*12} -----")
     for level, count in sorted(results.items(), key=lambda x: -x[1]):
         print(f"  {level:<12} {count}")
-
     outpath = os.path.join("data", "outputs", "logcount_results.txt")
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
     with open(outpath, "w") as f:
         for level, count in sorted(results.items(), key=lambda x: -x[1]):
             f.write(f"{level}: {count}\n")
-    print(f"\n[LOGCOUNT] Results saved to {outpath}")
+    print(f"\n[LOGCOUNT] Saved to {outpath}")
 
 
-# ── Print status ──────────────────────────────────────────────────────────────
+# ── Phase 3: Image Processing ─────────────────────────────────────────────────
+
+def run_imageprocess(image_source: str, transform: str,
+                     transform_params: dict = None):
+    from communication.client import MasterClient
+    from jobs.image_processing.image_pipeline import ImagePipeline, discover_images
+
+    client = _wait_for_master()
+
+    # Accept a directory or a single file
+    if os.path.isdir(image_source):
+        image_paths = discover_images(image_source)
+        if not image_paths:
+            print(f"[IMAGE] No images found in {image_source}")
+            return
+        print(f"\n[IMAGE] Found {len(image_paths)} image(s) in {image_source}")
+    elif os.path.isfile(image_source):
+        image_paths = [image_source]
+        print(f"\n[IMAGE] Processing single image: {image_source}")
+    else:
+        print(f"[IMAGE] Not found: {image_source}")
+        return
+
+    output_dir = os.path.join("data", "outputs", "images")
+    print(f"[IMAGE] Transform: {transform!r}")
+    print(f"[IMAGE] Output dir: {output_dir}")
+    print(f"[IMAGE] Running MapReduce pipeline…\n")
+
+    pipeline = ImagePipeline(client=client)
+    pipeline.run(
+        image_paths     = image_paths,
+        transform       = transform,
+        transform_params= transform_params or {},
+        output_dir      = output_dir,
+    )
+
+
+def list_transforms():
+    from jobs.image_processing.transforms import list_transforms, TRANSFORMS
+    print("\nAvailable image transforms:")
+    print(f"  {'NAME':<20} DESCRIPTION")
+    print(f"  {'-'*20} {'-'*45}")
+    descriptions = {
+        "grayscale"      : "Convert to grayscale",
+        "brightness"     : "Adjust brightness  (param: factor=1.5)",
+        "contrast"       : "Adjust contrast    (param: factor=1.5)",
+        "blur"           : "Gaussian blur      (param: radius=2.0)",
+        "sharpen"        : "Unsharp mask sharpen",
+        "resize"         : "Resize to exact size (params: width=256, height=256)",
+        "thumbnail"      : "Resize into box preserving ratio (param: size=128)",
+        "flip_horizontal": "Mirror left-right",
+        "flip_vertical"  : "Flip top-bottom",
+        "rotate"         : "Rotate image (param: degrees=90)",
+        "edge_detect"    : "Detect edges (FIND_EDGES filter)",
+        "sepia"          : "Apply warm sepia tone",
+        "invert"         : "Invert colours (negative)",
+    }
+    for name in list_transforms():
+        print(f"  {name:<20} {descriptions.get(name, '')}")
+
+
+# ── Status ────────────────────────────────────────────────────────────────────
 
 def print_status():
     from communication.client import MasterClient
@@ -195,8 +242,7 @@ if __name__ == "__main__":
 
     elif cmd == "run":
         mp = multiprocessing.Process(target=start_master, daemon=False)
-        mp.start()
-        time.sleep(1.5)
+        mp.start(); time.sleep(1.5)
         _spawn_workers()
         run_dummy_demo()
         print("\n[MAIN] Press Ctrl-C to stop.")
@@ -206,16 +252,29 @@ if __name__ == "__main__":
             mp.terminate()
 
     elif cmd == "wordcount":
-        if len(sys.argv) < 3:
-            print("Usage: python main.py wordcount <filepath>")
-            sys.exit(1)
+        if len(sys.argv) < 3: print("Usage: python main.py wordcount <file>"); sys.exit(1)
         run_wordcount(sys.argv[2])
 
     elif cmd == "logcount":
-        if len(sys.argv) < 3:
-            print("Usage: python main.py logcount <filepath>")
-            sys.exit(1)
+        if len(sys.argv) < 3: print("Usage: python main.py logcount <file>"); sys.exit(1)
         run_logcount(sys.argv[2])
+
+    elif cmd == "imageprocess":
+        if len(sys.argv) < 4:
+            print("Usage: python main.py imageprocess <image_dir_or_file> <transform>")
+            print("       python main.py transforms   (list all transforms)")
+            sys.exit(1)
+        # Parse optional key=value params after the transform name
+        params = {}
+        for arg in sys.argv[4:]:
+            if "=" in arg:
+                k, v = arg.split("=", 1)
+                try:    params[k] = float(v) if "." in v else int(v)
+                except: params[k] = v
+        run_imageprocess(sys.argv[2], sys.argv[3], params)
+
+    elif cmd == "transforms":
+        list_transforms()
 
     elif cmd == "demo":
         run_dummy_demo()
@@ -225,15 +284,20 @@ if __name__ == "__main__":
 
     else:
         print("""
-Distributed MapReduce — Phase 2
+Distributed MapReduce — Phase 3
 
-  python main.py master                   Start the master HTTP server
-  python main.py worker <id> [port]       Start a worker process
-  python main.py run                      Start everything + dummy demo
+  python main.py master                            Start master HTTP server
+  python main.py worker <id> [port]               Start a worker process
+  python main.py run                              Start everything + dummy demo
 
-  python main.py wordcount <file>         Run word-count on a text file
-  python main.py logcount  <file>         Run log-analysis on a log file
+  python main.py wordcount <file>                 Word count on a text file
+  python main.py logcount  <file>                 Log analysis on a log file
 
-  python main.py demo                     Submit Phase 1 dummy job
-  python main.py status                   Print system status
+  python main.py imageprocess <dir> <transform>   Process images in a directory
+  python main.py imageprocess <file> <transform>  Process a single image
+  python main.py imageprocess <dir> brightness factor=2.0  (with params)
+  python main.py transforms                       List all image transforms
+
+  python main.py demo                             Phase 1 dummy job
+  python main.py status                           Print system status
         """)
