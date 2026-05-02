@@ -1,0 +1,20 @@
+the quick brown fox jumps over the lazy dog
+distributed systems are complex but powerful
+the master node coordinates all worker nodes
+each worker executes map and reduce tasks
+the map phase transforms input into key value pairs
+the shuffle phase groups values by key
+the reduce phase aggregates grouped values into final output
+parallel processing reduces total execution time
+the system scales by adding more worker nodes
+fault tolerance is achieved through task retry logic
+the master tracks task status and worker health
+workers poll the master for available tasks
+results are collected and aggregated by the master
+the pipeline runs map then shuffle then reduce
+distributed computing enables processing of large datasets
+the word count job counts occurrences of each word
+the log analysis job counts log levels in log files
+each chunk of input becomes one map task
+the number of reduce tasks equals the number of unique keys
+python multiprocessing enables true parallel execution

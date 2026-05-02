@@ -1,0 +1,25 @@
+2024-01-15 00:01:10 INFO application boot sequence started
+2024-01-15 00:01:11 INFO loading configuration from config.yaml
+2024-01-15 00:01:12 DEBUG configuration parsed successfully
+2024-01-15 00:01:15 INFO database connection established
+2024-01-15 00:01:20 INFO worker pool initialized with 4 threads
+2024-01-15 00:02:01 INFO received request from 192.168.1.10
+2024-01-15 00:02:03 DEBUG cache lookup for user_id 501
+2024-01-15 00:02:04 INFO cache hit returning stored result
+2024-01-15 00:03:11 WARNING request queue depth 85 percent full
+2024-01-15 00:03:45 ERROR failed to parse json payload from client
+2024-01-15 00:04:00 INFO retrying database transaction attempt 1
+2024-01-15 00:04:01 INFO retrying database transaction attempt 2
+2024-01-15 00:04:02 ERROR database transaction failed after 2 retries
+2024-01-15 00:05:00 WARNING memory usage at 78 percent
+2024-01-15 00:05:30 INFO garbage collection triggered
+2024-01-15 00:05:31 DEBUG gc freed 412 mb of heap
+2024-01-15 00:06:00 INFO scheduled task invoice_generator started
+2024-01-15 00:06:45 INFO scheduled task invoice_generator completed
+2024-01-15 00:07:10 ERROR network timeout on outbound request to payment gateway
+2024-01-15 00:07:10 CRITICAL payment gateway unreachable rolling back transaction
+2024-01-15 00:07:11 ERROR rollback failed partial state may remain
+2024-01-15 00:08:00 INFO alert sent to on-call engineer
+2024-01-15 00:09:00 INFO payment gateway reconnected
+2024-01-15 00:09:05 INFO system resumed normal operation
+2024-01-15 00:10:00 DEBUG heartbeat check all services healthy

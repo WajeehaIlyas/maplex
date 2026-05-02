@@ -1,6 +1,10 @@
 # core/worker.py
 # Worker node: registers with master, polls for tasks, executes them,
 # reports results back.
+#
+# Phase 2 adds MAP and REDUCE task handlers.
+# The worker resolves mapper/reducer class names from the payload and
+# delegates to the appropriate mapreduce class.
 
 import time
 import logging
@@ -17,6 +21,29 @@ logging.basicConfig(
 )
 log = logging.getLogger("worker")
 
+# ── Registry: maps class-name strings → actual classes ───────────────────────
+# Add new mapper/reducer classes here as Phase 3 jobs are created.
+
+def _build_registry():
+    reg = {}
+    try:
+        from jobs.word_count.mapper  import WordCountMapper
+        from jobs.word_count.reducer import WordCountReducer
+        reg["WordCountMapper"]  = WordCountMapper
+        reg["WordCountReducer"] = WordCountReducer
+    except ImportError:
+        pass
+    try:
+        from jobs.log_analysis.mapper  import LogMapper
+        from jobs.log_analysis.reducer import LogReducer
+        reg["LogMapper"]  = LogMapper
+        reg["LogReducer"] = LogReducer
+    except ImportError:
+        pass
+    return reg
+
+CLASS_REGISTRY = _build_registry()
+
 
 class Worker:
     def __init__(self, worker_id: str, host: str = "127.0.0.1", port: int = 0):
@@ -27,14 +54,12 @@ class Worker:
         self.running   = False
         self._retries  = 0
 
-        # heartbeat thread
         self._hb_thread = threading.Thread(
             target=self._heartbeat_loop, daemon=True)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self):
-        """Register with master and begin polling loop."""
         resp = self.client.register_worker(self.worker_id, self.host, self.port)
         if resp.get("status") != "ok":
             raise RuntimeError(
@@ -62,23 +87,23 @@ class Worker:
             except Exception as exc:
                 self._retries += 1
                 log.error(
-                    f"Worker {self.worker_id} poll error (attempt "
-                    f"{self._retries}/{config.MAX_RETRIES}): {exc}")
+                    f"Worker {self.worker_id} poll error "
+                    f"(attempt {self._retries}/{config.MAX_RETRIES}): {exc}")
                 if self._retries >= config.MAX_RETRIES:
                     log.critical(
                         f"Worker {self.worker_id}: max retries reached. Stopping.")
                     self.running = False
                 time.sleep(config.POLL_INTERVAL * 2)
 
-    # ── Task execution ────────────────────────────────────────────────────────
+    # ── Task dispatch ─────────────────────────────────────────────────────────
 
     def _handle_task(self, task_dict: dict):
         task_id   = task_dict["task_id"]
         task_type = task_dict["task_type"]
         payload   = task_dict["payload"]
 
-        log.info(f"Worker {self.worker_id} executing task {task_id[:8]}… "
-                 f"[{task_type}]")
+        log.info(f"Worker {self.worker_id} executing "
+                 f"task {task_id[:8]}… [{task_type}]")
         try:
             result = self._execute(task_type, payload)
             self.client.submit_result(task_id, result, success=True)
@@ -90,25 +115,71 @@ class Worker:
                 task_id, result=None, success=False, error=str(exc))
 
     def _execute(self, task_type: str, payload):
-        """Dispatch to the correct handler based on task type."""
         if task_type == TaskType.DUMMY.value:
             return self._execute_dummy(payload)
-        # Phase 2: MAP / REDUCE handlers will be added here
+        if task_type == TaskType.MAP.value:
+            return self._execute_map(payload)
+        if task_type == TaskType.REDUCE.value:
+            return self._execute_reduce(payload)
         raise ValueError(f"Unknown task type: {task_type}")
 
-    # ── Task handlers (Phase 1: dummy only) ───────────────────────────────────
+    # ── Phase 1: dummy ────────────────────────────────────────────────────────
 
     def _execute_dummy(self, payload):
-        """
-        Dummy task: simulate work by squaring every number in the payload list.
-        Sleep briefly to mimic real processing time.
-        """
-        time.sleep(0.2)   # simulate work
+        time.sleep(0.2)
         if isinstance(payload, list):
             return [x ** 2 for x in payload]
         if isinstance(payload, (int, float)):
             return payload ** 2
         return f"processed: {payload}"
+
+    # ── Phase 2: MAP ──────────────────────────────────────────────────────────
+
+    def _execute_map(self, payload: dict):
+        """
+        Payload schema:
+            {
+              "chunk_index": int,
+              "lines":       List[str],
+              "mapper_cls":  str   e.g. "WordCountMapper"
+            }
+        Returns a list of (key, value) pairs.
+        """
+        mapper_cls_name = payload.get("mapper_cls", "")
+        mapper_cls      = CLASS_REGISTRY.get(mapper_cls_name)
+        if mapper_cls is None:
+            raise ValueError(f"Unknown mapper class: {mapper_cls_name!r}. "
+                             f"Available: {list(CLASS_REGISTRY.keys())}")
+
+        mapper = mapper_cls()
+        pairs  = mapper.apply(
+            chunk_index = payload["chunk_index"],
+            lines       = payload["lines"],
+        )
+        # Return as list-of-lists (JSON-serialisable)
+        return [[k, v] for k, v in pairs]
+
+    # ── Phase 2: REDUCE ───────────────────────────────────────────────────────
+
+    def _execute_reduce(self, payload: dict):
+        """
+        Payload schema:
+            {
+              "key":          Any,
+              "values":       List[Any],
+              "reducer_cls":  str   e.g. "WordCountReducer"
+            }
+        Returns a list of (output_key, output_value) pairs.
+        """
+        reducer_cls_name = payload.get("reducer_cls", "")
+        reducer_cls      = CLASS_REGISTRY.get(reducer_cls_name)
+        if reducer_cls is None:
+            raise ValueError(f"Unknown reducer class: {reducer_cls_name!r}. "
+                             f"Available: {list(CLASS_REGISTRY.keys())}")
+
+        reducer = reducer_cls()
+        pairs   = reducer.apply(payload)
+        return [[k, v] for k, v in pairs]
 
     # ── Heartbeat ─────────────────────────────────────────────────────────────
 
@@ -117,5 +188,5 @@ class Worker:
             try:
                 self.client.heartbeat(self.worker_id)
             except Exception:
-                pass   # heartbeat failure is non-fatal
+                pass
             time.sleep(5)

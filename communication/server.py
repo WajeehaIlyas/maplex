@@ -1,13 +1,10 @@
 # communication/server.py
-# Flask HTTP server that exposes the Master's functionality as REST endpoints.
-# Run this process to start the master node.
+# Flask HTTP server exposing Master functionality as REST endpoints.
+# Phase 2 adds: POST /task/submit  (single standalone task)
 
 from flask import Flask, request, jsonify
-import logging
-import sys
-import os
+import logging, sys, os
 
-# allow imports from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.master import Master
@@ -17,120 +14,81 @@ import config
 
 log = logging.getLogger("server")
 app = Flask(__name__)
-
-# Single shared Master instance
 master = Master()
-
 
 # ── Worker endpoints ──────────────────────────────────────────────────────────
 
 @app.route("/worker/register", methods=["POST"])
 def register_worker():
-    data = request.get_json()
-    result = master.register_worker(
-        worker_id = data["worker_id"],
-        host      = data.get("host", "127.0.0.1"),
-        port      = data.get("port", 0),
-    )
-    return jsonify(result)
-
+    d = request.get_json()
+    return jsonify(master.register_worker(
+        d["worker_id"], d.get("host","127.0.0.1"), d.get("port",0)))
 
 @app.route("/worker/heartbeat", methods=["POST"])
 def heartbeat():
-    data = request.get_json()
-    return jsonify(master.heartbeat(data["worker_id"]))
-
+    return jsonify(master.heartbeat(request.get_json()["worker_id"]))
 
 @app.route("/worker/task", methods=["GET"])
 def get_task():
-    worker_id = request.args.get("worker_id")
-    if not worker_id:
+    wid = request.args.get("worker_id")
+    if not wid:
         return jsonify({"error": "worker_id required"}), 400
-    task = master.get_next_task(worker_id)
-    return jsonify(task)          # None serialises as JSON null
-
+    return jsonify(master.get_next_task(wid))
 
 @app.route("/worker/result", methods=["POST"])
 def submit_result():
-    data = request.get_json()
-    result = master.submit_result(
-        task_id = data["task_id"],
-        result  = data.get("result"),
-        success = data.get("success", True),
-        error   = data.get("error"),
-    )
-    return jsonify(result)
+    d = request.get_json()
+    return jsonify(master.submit_result(
+        d["task_id"], d.get("result"), d.get("success", True), d.get("error")))
 
-
-# ── Client / job endpoints ────────────────────────────────────────────────────
+# ── Job endpoints ─────────────────────────────────────────────────────────────
 
 @app.route("/job/submit", methods=["POST"])
 def submit_job():
-    """
-    Expects JSON:
-    {
-      "name": "my-job",
-      "tasks": [
-        {"task_type": "DUMMY", "payload": [1, 2, 3]},
-        …
-      ]
-    }
-    """
-    data = request.get_json()
-    tasks = [
-        Task(task_type=TaskType(t["task_type"]), payload=t["payload"])
-        for t in data.get("tasks", [])
-    ]
-    job = Job(name=data.get("name", "unnamed"), input_data=None, tasks=tasks)
-    submitted = master.submit_job(job)
-    return jsonify({"job_id": submitted.job_id, "status": submitted.status.value,
-                    "total_tasks": submitted.total_tasks})
-
+    d     = request.get_json()
+    tasks = [Task(TaskType(t["task_type"]), t["payload"])
+             for t in d.get("tasks", [])]
+    job   = Job(name=d.get("name","unnamed"), input_data=None, tasks=tasks)
+    j     = master.submit_job(job)
+    return jsonify({"job_id": j.job_id, "status": j.status.value,
+                    "total_tasks": j.total_tasks})
 
 @app.route("/job/<job_id>", methods=["GET"])
 def job_status(job_id):
-    status = master.get_job_status(job_id)
-    if status is None:
-        return jsonify({"error": "not found"}), 404
-    return jsonify(status)
+    s = master.get_job_status(job_id)
+    return jsonify(s) if s else (jsonify({"error":"not found"}), 404)
 
+# ── Standalone task endpoint (used by Pipeline) ───────────────────────────────
+
+@app.route("/task/submit", methods=["POST"])
+def submit_task():
+    """Submit a single MAP or REDUCE task outside of a Job object."""
+    d    = request.get_json()
+    task = Task(TaskType(d["task_type"]), d["payload"])
+    master.submit_tasks([task])
+    return jsonify({"task_id": task.task_id, "status": task.status.value})
 
 @app.route("/task/<task_id>", methods=["GET"])
 def task_status(task_id):
-    status = master.get_task_status(task_id)
-    if status is None:
-        return jsonify({"error": "not found"}), 404
-    return jsonify(status)
-
+    s = master.get_task_status(task_id)
+    return jsonify(s) if s else (jsonify({"error":"not found"}), 404)
 
 # ── Monitoring endpoints ──────────────────────────────────────────────────────
 
-@app.route("/status", methods=["GET"])
-def system_status():
-    return jsonify(master.get_stats())
-
+@app.route("/status",  methods=["GET"])
+def system_status(): return jsonify(master.get_stats())
 
 @app.route("/workers", methods=["GET"])
-def list_workers():
-    return jsonify(master.list_workers())
-
+def list_workers():  return jsonify(master.list_workers())
 
 @app.route("/results", methods=["GET"])
-def all_results():
-    return jsonify(master.get_all_results())
+def all_results():   return jsonify(master.get_all_results())
 
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
-
+@app.route("/health",  methods=["GET"])
+def health():        return jsonify({"status": "ok"})
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"[SERVER] Master starting on {config.MASTER_HOST}:{config.MASTER_PORT}")
-    app.run(
-        host  = config.MASTER_HOST,
-        port  = config.MASTER_PORT,
-        debug = False,
-    )
+    print(f"[SERVER] Master on {config.MASTER_HOST}:{config.MASTER_PORT}")
+    app.run(host=config.MASTER_HOST, port=config.MASTER_PORT, debug=False)
