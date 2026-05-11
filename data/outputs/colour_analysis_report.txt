@@ -1,0 +1,16 @@
+COLOUR PALETTE FREQUENCY ANALYSIS
+MapReduce Job Report
+==================================================
+
+Images analysed : 4
+Total pixels    : 90,000
+Pipeline time   : 3.112s
+
+RANK  COLOUR            PIXELS     PCT
+----------------------------------------
+1     NEUTRAL           35,915   39.9%
+2     WARM              26,615   29.6%
+3     RED               22,682   25.2%
+4     BLUE               2,674    3.0%
+5     YELLOW             1,611    1.8%
+6     COOL                 503    0.6%

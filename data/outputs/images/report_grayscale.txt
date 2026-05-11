@@ -2,9 +2,20 @@ Image Processing Report
 Transform: grayscale
 ==================================================
 
-grayscale: 4 image(s)
+grayscale: 12 image(s)
   -> data/outputs/images/image1__grayscale.jpg
   -> data/outputs/images/image2__grayscale.jpg
   -> data/outputs/images/image3__grayscale.jpg
   -> data/outputs/images/image4__grayscale.jpg
+  -> data/outputs/images/large_cool_ocean__grayscale.jpg
+  -> data/outputs/images/large_green_forest__grayscale.jpg
+  -> data/outputs/images/large_mixed_tropical__grayscale.jpg
+  -> data/outputs/images/large_mixed_vibrant__grayscale.jpg
+  -> data/outputs/images/large_neutral_urban__grayscale.jpg
+  -> data/outputs/images/large_red_volcano__grayscale.jpg
+  -> data/outputs/images/large_warm_sunset__grayscale.jpg
+  -> data/outputs/images/large_yellow_desert__grayscale.jpg
+
+grayscale_error: 1 image(s)
+  !! [Errno 2] No such file or directory: 'data/sample_images/large_blue_night.jpg'
 

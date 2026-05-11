@@ -228,6 +228,50 @@ def print_status():
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
+# ── Enhancement 3: Colour Palette Frequency Analysis ─────────────────────────
+
+def run_colouranalysis(image_source: str):
+    from communication.client import MasterClient
+    from jobs.image_analysis.analysis_pipeline import (
+        ImageAnalysisPipeline, discover_images)
+
+    client = _wait_for_master()
+
+    if os.path.isdir(image_source):
+        image_paths = discover_images(image_source)
+        if not image_paths:
+            print(f"[COLOUR] No images found in {image_source}")
+            return
+    elif os.path.isfile(image_source):
+        image_paths = [image_source]
+    else:
+        print(f"[COLOUR] Not found: {image_source}"); return
+
+    pipeline = ImageAnalysisPipeline(client=client)
+    report   = pipeline.run(image_paths)
+    ImageAnalysisPipeline.print_report(report)
+
+    out = os.path.join("data", "outputs", "colour_analysis_report.txt")
+    ImageAnalysisPipeline.save_report(report, out)
+
+
+# ── Enhancement 1: Speedup Benchmark ─────────────────────────────────────────
+
+def run_benchmark(job: str, input_path: str, worker_counts=None):
+    from benchmark.speedup import SpeedupBenchmark
+
+    if worker_counts is None:
+        worker_counts = [1, 2, 3, 4]
+
+    bench   = SpeedupBenchmark(job=job, input_path=input_path,
+                               worker_counts=worker_counts)
+    results = bench.run()
+    bench.print_report(results)
+
+    out = os.path.join("data", "outputs", f"benchmark_{job}.txt")
+    SpeedupBenchmark.save_report(results, out)
+
 if __name__ == "__main__":
     import config
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
@@ -278,6 +322,22 @@ if __name__ == "__main__":
 
     elif cmd == "demo":
         run_dummy_demo()
+
+    elif cmd == "colouranalysis":
+        if len(sys.argv) < 3:
+            print("Usage: python main.py colouranalysis <image_dir_or_file>")
+            sys.exit(1)
+        run_colouranalysis(sys.argv[2])
+
+    elif cmd == "benchmark":
+        if len(sys.argv) < 4:
+            print("Usage: python main.py benchmark <job> <input_path> [1,2,3,4]")
+            print("  job: wordcount | logcount | colouranalysis")
+            sys.exit(1)
+        counts = None
+        if len(sys.argv) > 4:
+            counts = [int(x) for x in sys.argv[4].split(",")]
+        run_benchmark(sys.argv[2], sys.argv[3], counts)
 
     elif cmd == "status":
         print_status()

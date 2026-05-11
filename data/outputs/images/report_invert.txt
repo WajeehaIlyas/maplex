@@ -1,0 +1,10 @@
+Image Processing Report
+Transform: invert
+==================================================
+
+invert: 4 image(s)
+  -> data/outputs/images/image1__invert.jpg
+  -> data/outputs/images/image2__invert.jpg
+  -> data/outputs/images/image3__invert.jpg
+  -> data/outputs/images/image4__invert.jpg
+

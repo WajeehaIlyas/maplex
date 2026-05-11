@@ -2,7 +2,7 @@
 # Central configuration for the distributed MapReduce system.
 
 # ── Master settings ────────────────────────────────────────────────────────────
-MASTER_HOST = "127.0.0.1"
+MASTER_HOST = "0.0.0.0"
 MASTER_PORT = 5000
 MASTER_URL  = f"http://{MASTER_HOST}:{MASTER_PORT}"
 
